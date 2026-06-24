@@ -186,7 +186,7 @@ export default function ImageBackgroundRemover() {
           </div>
         </div>
       </div>
-      <div className="flex justify-center mb-24 md:mb-0">
+      <div className="md:flex justify-center mb-24 md:mb-0">
         <button
           className="ml-4 mt-6 px-6 py-2 bg-blue-600 text-white py-3 rounded-xl font-medium disabled:bg-gray-300 hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
           onClick={handleRemoveBackground}
