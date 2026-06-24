@@ -94,11 +94,7 @@ export default function ImageBackgroundRemover() {
   };
 
   return (
-    <div
-      className=" min-h-screen w-full flex flex-col items-center justify-center md:pt-16 md:px-4 p-4 md:gap-12  bg-gradient-to-b 
-            from-white 10% via-zinc-400 90% to-black 
-            dark:from-black dark:70% dark:via-zinc-800 dark:80% dark:to-white relative"
-    >
+    <div className=" min-h-screen w-full flex flex-col items-center justify-center md:pt-16 md:px-4 p-4 md:gap-12  bg-gradient-to-br from-white 10% via-zinc-400 90% to-black dark:from-black dark:70% dark:via-zinc-800 dark:80% dark:to-white relative">
       <header className="text-center md:mb-8">
         <h1 className="md:text-6xl text-4xl font-bold italic mb-2">Remoove</h1>
         <p className="md:text-lg text-sm text-zinc-600 dark:text-zinc-400">
@@ -228,28 +224,14 @@ export default function ImageBackgroundRemover() {
       {error && (
         <div className="mt-4 text-red-500 text-sm text-center">{error}</div>
       )}
-      <footer className="mt-auto w-full px-8 py-2 text-center text-zinc-500 dark:text-zinc-950 dark:text-zinc-400">
-        <div className="max-w-3xl mx-auto space-y-6">
-          <p className="text-sm leading-relaxed">
-            <strong>Remoove</strong> utilise des technologies de pointe pour le
-            traitement d'images haute performance. Notre moteur de suppression
-            d'arrière-plan est propulsé par la technologie
-            <a
-              href="https://img.ly/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ml-1 font-medium text-blue-600 hover:text-blue-500 underline transition-colors"
-            >
-              img.ly
-            </a>
-            , garantissant une précision optimale pour tous vos besoins.
-          </p>
 
-          <div className="pt-6 border-t border-zinc-100 dark:border-zinc-800 text-xs">
-            &copy; {new Date().getFullYear()} Remoove par Wildis. Tous droits
-            réservés.
-          </div>
-        </div>
+      <footer className="pt-6  w-full max-w-screen-xl mx-auto p-2 text-center text-zinc-500 dark:text-zinc-950 mt-auto ">
+        &copy; {new Date().getFullYear()} Remoove par Wildis. Tous droits
+        réservés.
+        <span className="mx-2 text-zinc-300 dark:text-zinc-700">|</span>
+        <a href="/legal" className="hover:text-blue-600 transition-colors">
+          Confidentialité & Stockage
+        </a>
       </footer>
     </div>
   );

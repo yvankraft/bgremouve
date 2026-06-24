@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Remoove | Supprimer fond image gratuitement en ligne (IA)",
+  title: "Remoove ",
   description:
     "Détourez vos photos produits instantanément avec notre IA. Outil 100% gratuit, rapide et performant. Supprimez l'arrière-plan en un clic.",
   keywords:
