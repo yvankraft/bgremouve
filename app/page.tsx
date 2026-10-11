@@ -43,6 +43,49 @@ interface ImageItem {
 const outName = (name: string) =>
   `${name.replace(/\.[^.]+$/, "") || "image"}-sans-fond.png`;
 
+const HEIC_RE = /\.(heic|heif)$/i;
+
+const isHeicFile = (f: File) =>
+  f.type === "image/heic" ||
+  f.type === "image/heif" ||
+  HEIC_RE.test(f.name);
+
+const decodeHeicNatively = async (file: File): Promise<Blob | null> => {
+  try {
+    const bmp = await createImageBitmap(file);
+    const canvas = document.createElement("canvas");
+    canvas.width = bmp.width;
+    canvas.height = bmp.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(bmp, 0, 0);
+    bmp.close();
+    return await new Promise<Blob | null>((r) =>
+      canvas.toBlob(r, "image/jpeg", 0.92)
+    );
+  } catch {
+    return null;
+  }
+};
+
+const convertHeicToJpeg = async (file: File): Promise<File | null> => {
+  let blob: Blob | null = null;
+  try {
+    const { heicTo } = await import("heic-to");
+    blob = await heicTo({ blob: file, type: "image/jpeg", quality: 0.92 });
+  } catch (e) {
+    console.error(
+      `Conversion HEIC échouée, tentative native (${file.name})`,
+      e
+    );
+    blob = await decodeHeicNatively(file);
+  }
+  if (!blob) return null;
+  return new File([blob], file.name.replace(HEIC_RE, ".jpg"), {
+    type: "image/jpeg",
+  });
+};
+
 const triggerDownload = (href: string, filename: string) => {
   const link = document.createElement("a");
   link.href = href;
@@ -203,6 +246,83 @@ const STEPS = [
   { icon: Download, label: "Téléchargez en PNG ou ZIP" },
 ];
 
+const FAQ_ITEMS = [
+  {
+    q: "Remoove est-il vraiment gratuit ?",
+    a: "Oui. Le détourage est illimité, sans filigrane et sans création de compte. Le traitement s’exécute dans votre navigateur : aucun serveur à payer, donc aucun coût à vous refacturer.",
+  },
+  {
+    q: "Mes photos sont-elles envoyées sur internet ?",
+    a: "Non. Le modèle d’IA fonctionne localement via WebAssembly : vos images ne quittent jamais votre appareil. C’est idéal pour les photos sensibles, professionnelles ou personnelles.",
+  },
+  {
+    q: "Puis-je détourer plusieurs images en même temps ?",
+    a: "Oui. Sélectionnez ou glissez plusieurs photos, lancez le traitement par lot, puis téléchargez chaque PNG individuellement ou toutes les images regroupées dans une archive ZIP.",
+  },
+  {
+    q: "Est-ce que ça marche sur téléphone et avec une connexion lente ?",
+    a: "Oui. Remoove est conçu pour le mobile. Après un premier chargement, le navigateur garde le modèle d’IA en cache : les traitements suivants restent rapides, même avec une connexion instable.",
+  },
+  {
+    q: "Pour quels usages puis-je utiliser Remoove ?",
+    a: "Photos produits pour vos boutiques en ligne (Jumia, WhatsApp Business, réseaux sociaux), photos d’identité, visuels de communication, design graphique, montages…",
+  },
+  {
+    q: "Quels formats sont acceptés et exportés ?",
+    a: "En entrée : PNG, JPG, WebP et la plupart des formats image. En sortie : PNG avec fond transparent, téléchargeable individuellement ou en lot dans un ZIP.",
+  },
+];
+
+const SITE_URL = "https://remoove.yvancorps.com";
+
+const JSON_LD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebApplication",
+      "@id": `${SITE_URL}/#app`,
+      name: "Remoove",
+      url: SITE_URL,
+      description:
+        "Outil gratuit de suppression d’arrière-plan par IA : détourage de photos en un clic ou par lot, traitement 100% local dans le navigateur, export PNG et ZIP.",
+      applicationCategory: "MultimediaApplication",
+      operatingSystem: "Any",
+      browserRequirements: "Nécessite JavaScript",
+      inLanguage: "fr-FR",
+      isAccessibleForFree: true,
+      offers: { "@type": "Offer", price: "0", priceCurrency: "XAF" },
+      featureList: [
+        "Suppression d’arrière-plan par intelligence artificielle",
+        "Traitement par lot de plusieurs images",
+        "Export PNG transparent et archive ZIP",
+        "Traitement 100% local — aucune image envoyée sur un serveur",
+      ],
+      areaServed: [
+        { "@type": "Country", name: "Cameroon" },
+        { "@type": "Country", name: "Gabon" },
+        { "@type": "Country", name: "Republic of the Congo" },
+        { "@type": "Country", name: "Democratic Republic of the Congo" },
+        { "@type": "Country", name: "Chad" },
+        { "@type": "Country", name: "Central African Republic" },
+        { "@type": "Country", name: "Equatorial Guinea" },
+      ],
+      author: {
+        "@type": "Organization",
+        name: "Wildis",
+        url: "https://yvancorps.com",
+      },
+    },
+    {
+      "@type": "FAQPage",
+      mainEntity: FAQ_ITEMS.map((f) => ({
+        "@type": "Question",
+        name: f.q,
+        acceptedAnswer: { "@type": "Answer", text: f.a },
+      })),
+    },
+  ],
+};
+
 export default function ImageBackgroundRemover() {
   const [items, setItems] = useState<ImageItem[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -226,10 +346,10 @@ export default function ImageBackgroundRemover() {
     };
   }, []);
 
-  const track = (url: string) => {
+  const track = useCallback((url: string) => {
     urlsRef.current.add(url);
     return url;
-  };
+  }, []);
   const release = (url?: string) => {
     if (url && urlsRef.current.delete(url)) URL.revokeObjectURL(url);
   };
@@ -239,28 +359,44 @@ export default function ImageBackgroundRemover() {
       prev.map((i) => (i.id === id ? { ...i, ...patch } : i))
     );
 
-  const addFiles = useCallback((files: Iterable<File> | FileList) => {
-    const arr = Array.from(files);
-    const valid = arr.filter((f) => f.type.startsWith("image/"));
-    setError(
-      valid.length < arr.length
-        ? "Certains fichiers ont été ignorés : seules les images sont acceptées."
-        : null
-    );
-    if (!valid.length) return;
-    setItems((prev) => [
-      ...prev,
-      ...valid.map((file) => ({
-        id: crypto.randomUUID(),
-        file,
-        name: file.name,
-        previewUrl: track(URL.createObjectURL(file)),
-        status: "pending" as Status,
-        progress: 0,
-        showOriginal: false,
-      })),
-    ]);
-  }, []);
+  const addFiles = useCallback(
+    (files: Iterable<File> | FileList) => {
+      const arr = Array.from(files);
+      const valid = arr.filter(
+        (f) => f.type.startsWith("image/") || isHeicFile(f)
+      );
+      setError(
+        valid.length < arr.length
+          ? "Certains fichiers ont été ignorés : seules les images sont acceptées."
+          : null
+      );
+      if (!valid.length) return;
+      void Promise.all(
+        valid.map((f) => (isHeicFile(f) ? convertHeicToJpeg(f) : f))
+      ).then((converted) => {
+        const ready = converted.filter((f): f is File => f !== null);
+        if (ready.length < converted.length) {
+          setError(
+            "Certaines photos HEIC n’ont pas pu être converties."
+          );
+        }
+        if (!ready.length) return;
+        setItems((prev) => [
+          ...prev,
+          ...ready.map((file) => ({
+            id: crypto.randomUUID(),
+            file,
+            name: file.name,
+            previewUrl: track(URL.createObjectURL(file)),
+            status: "pending" as Status,
+            progress: 0,
+            showOriginal: false,
+          })),
+        ]);
+      });
+    },
+    [track]
+  );
 
   // Coller une image depuis le presse-papiers
   useEffect(() => {
@@ -405,6 +541,10 @@ export default function ImageBackgroundRemover() {
 
   return (
     <div className="relative min-h-screen overflow-x-clip bg-slate-950 text-slate-100">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
+      />
       {/* Halos lumineux */}
       <div aria-hidden className="pointer-events-none absolute inset-0">
         <div className="absolute inset-x-0 top-0 h-[700px] bg-grid [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,black,transparent)]" />
@@ -510,8 +650,8 @@ export default function ImageBackgroundRemover() {
                 Glissez vos images ici
               </p>
               <p className="mt-2 text-sm text-slate-500">
-                ou cliquez pour parcourir — PNG, JPG, WebP… sélection multiple
-                acceptée
+                ou cliquez pour parcourir — PNG, JPG, WebP, HEIC (photos
+                iPhone)… sélection multiple acceptée
               </p>
             </div>
           ) : (
@@ -635,7 +775,9 @@ export default function ImageBackgroundRemover() {
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-center text-slate-400">
               Un outil de détourage pensé pour la vitesse, le volume et le
-              respect de votre vie privée.
+              respect de votre vie privée — conçu pour les créateurs, vendeurs
+              en ligne et entrepreneurs du Cameroun et de toute l’Afrique
+              centrale.
             </p>
             <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {FEATURES.map((f) => (
@@ -651,6 +793,35 @@ export default function ImageBackgroundRemover() {
                     {f.text}
                   </p>
                 </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* FAQ */}
+        <section className="border-t border-white/5">
+          <div className="mx-auto max-w-4xl px-6 py-20">
+            <h2 className="text-center text-2xl font-bold sm:text-3xl">
+              Questions fréquentes
+            </h2>
+            <p className="mx-auto mt-3 max-w-xl text-center text-slate-400">
+              Tout ce qu’il faut savoir avant de supprimer le fond de vos
+              photos.
+            </p>
+            <div className="mt-10 space-y-3">
+              {FAQ_ITEMS.map((f) => (
+                <details
+                  key={f.q}
+                  className="group rounded-2xl border border-white/5 bg-white/[0.03] px-5 py-4 transition-colors open:border-sky-500/30 open:bg-white/[0.05]"
+                >
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-medium">
+                    {f.q}
+                    <Plus className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-45" />
+                  </summary>
+                  <p className="mt-3 text-sm leading-relaxed text-slate-400">
+                    {f.a}
+                  </p>
+                </details>
               ))}
             </div>
           </div>

@@ -19,6 +19,13 @@ body {
   background: rgba(56, 189, 248, 0.35);
 }
 
+summary::-webkit-details-marker {
+  display: none;
+}
+summary::marker {
+  content: none;
+}
+
 /* Damier pour visualiser la transparence des PNG */
 .bg-checkerboard {
   background-color: #475569;
